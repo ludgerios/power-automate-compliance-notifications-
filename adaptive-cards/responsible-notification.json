@@ -4,15 +4,6 @@
   "version": "1.5",
   "body": [
     {
-      "type": "TextBlock",
-      "size": "ExtraLarge",
-      "weight": "Bolder",
-      "color": "Accent",
-      "text": "Compliance Control Reminder",
-      "wrap": true,
-      "horizontalAlignment": "Center"
-    },
-{
   "type": "Image",
   "url": "https://raw.githubusercontent.com/ludgerios/power-automate-compliance-notifications-/main/card-icons/ludgeriios-logo.png",
   "altText": "Ludgeriios Automações e Soluções",
@@ -20,10 +11,19 @@
   "horizontalAlignment": "Center",
   "spacing": "None"
 },
-     {
+   {
+      "type": "TextBlock",
+      "size": "ExtraLarge",
+      "weight": "Bolder",
+      "color": "Accent",
+      "text": "Lembrete de Controle de Compliance",
+      "wrap": true,
+      "horizontalAlignment": "Center"
+    },
+    {
       "type": "TextBlock",
       "weight": "Bolder",
-      "text": "Hello, @{item()?['ControlOwner']}!",
+      "text": "Olá, @{item()?['ControlOwner']}!",
       "wrap": true,
       "separator": true,
       "spacing": "Medium"
@@ -35,7 +35,7 @@
       "items": [
         {
           "type": "TextBlock",
-          "text": "Control requiring attention",
+          "text": "Controle que requer atenção",
           "weight": "Bolder",
           "color": "Accent",
           "wrap": true
@@ -53,7 +53,7 @@
       "spacing": "Medium",
       "facts": [
         {
-          "title": "Days until test:",
+          "title": "Dias até o teste:",
           "value": "@{outputs('Preparar_Quantidade_de_Dias')}"
         },
         {
@@ -64,7 +64,7 @@
     },
     {
       "type": "TextBlock",
-      "text": "Please review the control information and prepare the required evidence before the scheduled test date.",
+      "text": "Revise as informações do controle e prepare as evidências necessárias antes da data programada para o teste.",
       "wrap": true,
       "spacing": "Medium",
       "isSubtle": true
@@ -73,7 +73,7 @@
   "actions": [
     {
       "type": "Action.OpenUrl",
-      "title": "View project",
+      "title": "Acessar o projeto",
       "url": "https://github.com/ludgerios/power-automate-compliance-notifications-"
     }
   ]
