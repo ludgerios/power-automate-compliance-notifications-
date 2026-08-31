@@ -4,21 +4,22 @@
   "version": "1.5",
   "body": [
     {
-  "type": "Image",
-  "url": "https://raw.githubusercontent.com/ludgerios/power-automate-compliance-notifications-/main/card-icons/ludgeriios-logo.png",
-  "altText": "Ludgeriios Automações e Soluções",
-  "size": "Stretch",
-  "horizontalAlignment": "Center",
-  "spacing": "None"
-},
-   {
+      "type": "Image",
+      "url": "https://raw.githubusercontent.com/ludgerios/power-automate-compliance-notifications-/main/card-icons/ludgeriios-logo.png",
+      "altText": "Ludgeriios Automações e Soluções",
+      "size": "Stretch",
+      "horizontalAlignment": "Center",
+      "spacing": "None"
+    },
+    {
       "type": "TextBlock",
       "size": "ExtraLarge",
       "weight": "Bolder",
       "color": "Accent",
       "text": "Lembrete de Controle de Compliance",
       "wrap": true,
-      "horizontalAlignment": "Center"
+      "horizontalAlignment": "Center",
+      "spacing": "Medium"
     },
     {
       "type": "TextBlock",
@@ -41,30 +42,45 @@
           "wrap": true
         },
         {
-          "type": "TextBlock",
-          "text": "@{outputs('Montar_Descrição_do_Controle')}",
-          "wrap": true,
-          "spacing": "Small"
+          "type": "FactSet",
+          "spacing": "Small",
+          "facts": [
+            {
+              "title": "Nº do controle:",
+              "value": "@{item()?['ControlID']}"
+            },
+            {
+              "title": "Descrição:",
+              "value": "@{item()?['ControlDescription']}"
+            },
+            {
+              "title": "Data do próximo teste:",
+              "value": "@{formatDateTime(addDays('1899-12-30',int(item()?['NextTestDate'])),'dd/MM/yyyy')}"
+            },
+            {
+              "title": "Status:",
+              "value": "@{item()?['TestStatus']}"
+            }
+          ]
         }
       ]
     },
     {
-      "type": "FactSet",
+      "type": "Container",
+      "style": "warning",
       "spacing": "Medium",
-      "facts": [
+      "items": [
         {
-          "title": "Dias até o teste:",
-          "value": "@{outputs('Preparar_Quantidade_de_Dias')}"
-        },
-        {
-          "title": "Status:",
-          "value": "@{item()?['TestStatus']}"
+          "type": "TextBlock",
+          "weight": "Bolder",
+          "wrap": true,
+          "text": "@{if(less(outputs('DiasParaVencer'),0),concat('Em atraso há ',string(mul(outputs('DiasParaVencer'),-1)),' dia(s).'),concat('Faltam ',string(outputs('DiasParaVencer')),' dia(s) para o teste.'))}"
         }
       ]
     },
     {
       "type": "TextBlock",
-      "text": "Revise as informações do controle e prepare as evidências necessárias antes da data programada para o teste.",
+      "text": "Revise as informações do controle e prepare as evidências necessárias para a execução do teste.",
       "wrap": true,
       "spacing": "Medium",
       "isSubtle": true
