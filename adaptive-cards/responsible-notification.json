@@ -1,0 +1,72 @@
+{
+  "$schema": "https://adaptivecards.io/schemas/adaptive-card.json",
+  "type": "AdaptiveCard",
+  "version": "1.5",
+  "body": [
+    {
+      "type": "TextBlock",
+      "size": "ExtraLarge",
+      "weight": "Bolder",
+      "color": "Accent",
+      "text": "Compliance Control Reminder",
+      "wrap": true,
+      "horizontalAlignment": "Center"
+    },
+    {
+      "type": "TextBlock",
+      "weight": "Bolder",
+      "text": "Hello, @{item()?['ControlOwner']}!",
+      "wrap": true,
+      "separator": true,
+      "spacing": "Medium"
+    },
+    {
+      "type": "Container",
+      "style": "emphasis",
+      "spacing": "Medium",
+      "items": [
+        {
+          "type": "TextBlock",
+          "text": "Control requiring attention",
+          "weight": "Bolder",
+          "color": "Accent",
+          "wrap": true
+        },
+        {
+          "type": "TextBlock",
+          "text": "@{outputs('Montar_Descrição_do_Controle')}",
+          "wrap": true,
+          "spacing": "Small"
+        }
+      ]
+    },
+    {
+      "type": "FactSet",
+      "spacing": "Medium",
+      "facts": [
+        {
+          "title": "Days until test:",
+          "value": "@{outputs('Preparar_Quantidade_de_Dias')}"
+        },
+        {
+          "title": "Status:",
+          "value": "@{item()?['TestStatus']}"
+        }
+      ]
+    },
+    {
+      "type": "TextBlock",
+      "text": "Please review the control information and prepare the required evidence before the scheduled test date.",
+      "wrap": true,
+      "spacing": "Medium",
+      "isSubtle": true
+    }
+  ],
+  "actions": [
+    {
+      "type": "Action.OpenUrl",
+      "title": "View project",
+      "url": "https://github.com/ludgerios/power-automate-compliance-notifications-"
+    }
+  ]
+}
