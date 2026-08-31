@@ -1,127 +1,91 @@
 # Power Automate Compliance Notifications
 
-Projeto de laboratório desenvolvido no **Microsoft Power Automate** para acompanhar datas de testes de controles, enviar notificações pelo Microsoft Teams e registrar os envios em uma base de log.
+Automação de laboratório desenvolvida no **Microsoft Power Automate** para monitorar datas de testes de controles, enviar notificações pelo Microsoft Teams e registrar os envios em uma tabela de log.
 
 A solução é composta por dois fluxos:
 
-- **Fluxo pai:** envia notificações individuais aos responsáveis pelos controles.
-- **Fluxo filho:** enviará uma notificação consolidada aos gerentes quando houver controles atrasados em `-1`, `-5` ou `-7` dias.
+- **Fluxo pai:** envia um Adaptive Card individual ao responsável.
+- **Fluxo filho:** consolida controles atrasados e envia um Adaptive Card para cada gerente.
 
-> O repositório utiliza somente dados fictícios e conexões de laboratório.
+> O repositório utiliza dados fictícios. As conexões do Excel Online e Microsoft Teams devem ser configuradas pelo usuário durante a importação.
 
----
-
-## Arquitetura da solução
+## Arquitetura
 
 ```text
 Fluxo pai
 Notificação individual ao responsável
         ↓
-Finaliza o processamento dos controles
+Finaliza o processamento da base
         ↓
-Executa o fluxo filho
+Executa o fluxo filho uma única vez
         ↓
 Fluxo filho
-Consolida os controles atrasados por gerente
+Agrupa controles atrasados por gerente
         ↓
-Envia um card para cada gerente
+Envia um card consolidado por gerente
 ```
-
-Atualmente, este README documenta principalmente o **fluxo pai**. O fluxo filho será adicionado ao repositório após a conclusão da adaptação para o ambiente de laboratório.
 
 ---
 
-# Fluxo pai: notificação ao responsável
+# Fluxo pai
 
-## Objetivo
+## LAB-COMPLIANCE-NOTIFICACAO-RESPONSAVEL
 
-Ler os controles cadastrados em uma planilha Excel, identificar testes próximos do vencimento ou atrasados e enviar um **Adaptive Card individual** ao responsável pelo controle.
+O fluxo pai consulta a base de laboratório, valida os controles elegíveis e envia notificações individuais aos responsáveis.
 
-Após o envio, o fluxo registra os dados da notificação no log.
-
-## Fonte de dados de laboratório
+## Base de laboratório
 
 - **Arquivo:** `Compliance_Control_Monitoring_Lab.xlsx`
-- **Tabela configurada no Excel:** `Tabela1`
-- **Armazenamento:** OneDrive for Business de laboratório
+- **Tabela de controles:** `Tabela1`
+- **Tabela de log:** `Tabela2`
+- **Armazenamento:** OneDrive for Business
 
 ### Colunas utilizadas
 
-| Coluna | Finalidade |
+| Coluna | Utilização |
 |---|---|
-| `ControlID` | Código único do controle |
+| `ControlID` | Código do controle |
 | `ControlOwner` | Nome do responsável |
-| `OwnerEmail` | E-mail do responsável |
-| `ManagerName` | Nome do gerente |
-| `ManagerEmail` | E-mail do gerente |
+| `OwnerEmail` | E-mail demonstrativo do responsável |
 | `ControlDescription` | Descrição do controle |
 | `ControlStatus` | Situação operacional do controle |
 | `NextTestDate` | Data do próximo teste em número serial do Excel |
 | `TestStatus` | Situação do teste |
 | `LastTestDate` | Data do último teste |
+| `ManagerName` | Nome demonstrativo do gerente |
+| `ManagerEmail` | E-mail demonstrativo do gerente, utilizado pelo fluxo filho |
 
----
+## Regras de processamento
 
-## Regras do fluxo pai
-
-Um registro somente continua no fluxo quando atende às seguintes regras:
+O controle somente continua quando todas as condições abaixo são atendidas:
 
 ```text
 ControlStatus = Work
 E
 TestStatus = ON TIME ou LATE
 E
-NextTestDate válida
+NextTestDate contém um número serial válido
 E
 DiasParaVencer = 7, 5, 1, -1, -5 ou -7
 ```
 
-### Validação do ControlStatus
-
-A comparação normaliza letras maiúsculas, minúsculas e espaços:
+A validação de `ControlStatus` normaliza letras e espaços:
 
 ```text
 toUpper(trim(string(item()?['ControlStatus']))) = WORK
 ```
 
-São aceitos valores como:
+A validação aceita `Work`, `WORK` e `work`, mas rejeita `Not Work`, `Disabled` e `Implementation Required`.
 
-```text
-Work
-WORK
-work
-```
-
-São ignorados valores como:
-
-```text
-Not Work
-Disabled
-Implementation Required
-```
-
-### Validação do TestStatus
-
-O fluxo pai aceita:
-
-```text
-ON TIME
-LATE
-```
-
-Registros com `CONCLUDED` ou campo vazio são ignorados.
-
-### Validação da data
-
-A coluna `NextTestDate` deve conter um número serial válido do Excel:
+A data é validada antes do cálculo:
 
 ```text
 isInt(string(item()?['NextTestDate']))
 ```
 
-Essa validação impede que valores vazios, textos ou `#N/A` sejam enviados ao cálculo.
+Valores vazios, textos e `#N/A` são ignorados sem interromper a execução.
 
-### Cálculo dos dias
+## Cálculo dos dias
 
 ```text
 DiasParaVencer = NextTestDate - data atual
@@ -155,125 +119,122 @@ sub(
 | `-5` | Notifica com 5 dias de atraso |
 | `-7` | Notifica com 7 dias de atraso |
 
-Qualquer outro valor é ignorado.
+Outros resultados não geram notificação.
 
-### Destinatário
+## Destinatário de teste
 
-O fluxo pai envia somente para o responsável:
+O gatilho manual solicita o campo:
 
 ```text
-OwnerEmail
+DestinatarioTeste
 ```
 
-O gerente não é notificado pelo fluxo pai.
+O valor é armazenado em `varDestinatario` e utilizado no envio do Teams e no registro do log. O endereço informado deve representar um usuário válido no mesmo tenant da conexão do Microsoft Teams.
 
----
+## Funcionamento técnico
 
-## Funcionamento do fluxo pai
+### 1. Inicialização e leitura da base
 
-### 1. Inicialização e leitura da tabela
+O fluxo recebe o destinatário de teste, inicializa as variáveis, lê a `Tabela1` e percorre cada controle retornado pelo Excel.
 
-O fluxo:
+<p align="center">
+  <img src="fotos%20da%20estrutura%20do%20fluxo/inicializacao-fluxo-responsavel.png" alt="Inicialização e leitura da base" width="900">
+</p>
 
-1. é iniciado manualmente;
-2. define o ambiente de execução;
-3. define o destinatário utilizado nos testes;
-4. lista as linhas da tabela `Tabela1`;
-5. percorre cada registro retornado pelo Excel.
+<p align="center"><em>Inicialização das variáveis e leitura da tabela de controles.</em></p>
 
-![Inicialização do fluxo responsável](fotos%20da%20estrutura%20do%20fluxo/inicializacao-fluxo-responsavel.png)
+### 2. Validação e cálculo
 
-### 2. Validação da data e cálculo
+Para cada controle, o fluxo valida `ControlStatus`, `TestStatus` e `NextTestDate`. Depois, calcula `DiasParaVencer`.
 
-Para cada registro, o fluxo:
+<p align="center">
+  <img src="fotos%20da%20estrutura%20do%20fluxo/validacao-data-fluxo-responsavel.png" alt="Validação da data e cálculo dos dias" width="900">
+</p>
 
-1. valida `TestStatus` e `ControlStatus`;
-2. valida se `NextTestDate` é um número inteiro;
-3. captura a data do próximo teste;
-4. prepara o valor para o cálculo;
-5. calcula `DiasParaVencer`.
-
-Registros inválidos seguem pelo ramo falso e são ignorados sem interromper a execução.
-
-![Validação da data do fluxo responsável](fotos%20da%20estrutura%20do%20fluxo/validacao-data-fluxo-responsavel.png)
+<p align="center"><em>Validação da elegibilidade, tratamento da data serial e cálculo dos dias.</em></p>
 
 ### 3. Preparação, envio e log
 
-Quando `DiasParaVencer` corresponde a `7`, `5`, `1`, `-1`, `-5` ou `-7`, o fluxo:
+Quando o resultado corresponde a um marco de notificação, o fluxo prepara os dados, envia o Adaptive Card e registra o envio na `Tabela2`.
 
-1. captura `ControlOwner`;
-2. monta a descrição do controle;
-3. formata `NextTestDate` como `dd/MM/yyyy`;
-4. prepara a quantidade de dias;
-5. define o destinatário com `OwnerEmail`;
-6. envia o Adaptive Card pelo Microsoft Teams;
-7. registra a notificação no log.
+<p align="center">
+  <img src="fotos%20da%20estrutura%20do%20fluxo/envio-notificacao-fluxo-responsavel.png" alt="Preparação, envio e registro no log" width="900">
+</p>
 
-![Envio da notificação do fluxo responsável](fotos%20da%20estrutura%20do%20fluxo/envio-notificacao-fluxo-responsavel.png)
+<p align="center"><em>Validação da janela, envio pelo Teams e registro da notificação.</em></p>
 
-### Estrutura completa
+### 4. Estrutura completa
 
-![Estrutura completa do fluxo pai](fotos%20da%20estrutura%20do%20fluxo/estrutura-completa.png)
+<p align="center">
+  <img src="fotos%20da%20estrutura%20do%20fluxo/estrutura-completa.png" alt="Estrutura completa do fluxo pai" width="900">
+</p>
 
----
+<p align="center"><em>Visão completa do fluxo pai.</em></p>
 
-## Adaptive Card do responsável
+## Adaptive Card
 
 O card apresenta:
 
-- identidade visual do projeto Ludgeriios;
+- identidade visual do projeto;
 - nome do responsável;
-- identificação e descrição do controle;
+- código e descrição do controle;
 - data do próximo teste;
-- quantidade de dias;
 - status do teste;
-- botão para abrir a página demonstrativa do projeto.
+- dias restantes ou dias em atraso;
+- botão para acessar o projeto.
 
-O template está disponível em:
+<p align="center">
+  <img src="">
+</p>
+
+<p align="center"><em>Exemplo do Adaptive Card enviado pelo Microsoft Teams.</em></p>
+
+Arquivos relacionados:
 
 ```text
 adaptive-cards/responsible-notification.json
-```
-
-A identidade visual está disponível em:
-
-```text
 card-icons/ludgeriios-logo.png
 ```
 
----
-
 ## Log de notificações
 
-O fluxo registra os envios em uma tabela de log com os seguintes campos:
+O envio é registrado na `Tabela2` com os seguintes campos:
 
 | Campo | Conteúdo |
 |---|---|
-| `SentAt` | Data e hora do envio |
-| `ControlID` | Código do controle |
-| `TestDate` | Data prevista do teste |
-| `Days` | Dias restantes ou em atraso |
-| `Recipient` | Destinatário utilizado |
+| `Data Envio` | Data e hora do envio |
+| `Controle` | Código do controle |
+| `Data do Teste` | Data prevista para o teste |
+| `Qtd de Dias` | Dias restantes ou em atraso |
+| `Email` | Destinatário informado no gatilho |
 | `Status` | Resultado do envio |
-| `NotificationType` | Tipo da notificação |
+| `tipo` | `Responsável` |
 
-Para o fluxo pai:
+## Pacote importável
+
+O pacote do fluxo pai está disponível em:
 
 ```text
-NotificationType = Responsible
+fluxos/fluxo-pai/
 ```
+
+Após importar o pacote como um novo fluxo:
+
+1. selecione conexões próprias para Excel Online e Microsoft Teams;
+2. configure `Compliance_Control_Monitoring_Lab.xlsx`;
+3. selecione `Tabela1` na ação de leitura;
+4. selecione `Tabela2` na ação de log;
+5. informe um usuário válido em `DestinatarioTeste`.
 
 ---
 
-# Fluxo filho: notificação ao gerente
+# Fluxo filho
 
-## Objetivo
+## Notificação consolidada ao gerente
 
-O fluxo filho será responsável por consolidar os controles atrasados e enviar **um único card para cada gerente**.
+O fluxo filho será responsável por agrupar controles atrasados por `ManagerEmail` e enviar **um único card para cada gerente**.
 
-Cada gerente deverá receber somente os controles relacionados ao próprio `ManagerEmail`.
-
-## Regras do fluxo filho
+## Regras previstas
 
 ```text
 ControlStatus = Work
@@ -287,98 +248,46 @@ E
 DiasParaVencer = -1, -5 ou -7
 ```
 
-## Conteúdo esperado no card
+O card consolidado apresentará:
 
 ```text
 Nº Controle | Responsável | Data do teste | Dias em atraso
 ```
 
-## Comportamento esperado
+### Comportamento esperado
 
 - Um card por gerente em cada execução.
-- Vários controles podem aparecer no mesmo card.
-- Controles de gerentes diferentes não podem ser misturados.
-- O envio deve ocorrer dentro do loop de gerentes.
-- O envio não deve ocorrer dentro do loop que analisa os controles.
+- Vários controles podem ser consolidados no mesmo card.
+- Cada gerente recebe apenas os controles associados ao respectivo `ManagerEmail`.
+- O fluxo filho é chamado uma única vez, após a conclusão do loop do fluxo pai.
 
-## Estado atual
-
-O fluxo filho será enviado ao repositório depois da conclusão da adaptação para a base de laboratório.
-
-Quando o fluxo filho for incluído, este README será atualizado com:
-
-- estrutura do fluxo;
-- regras e expressões;
-- template do card consolidado;
-- prints do processamento;
-- configuração da integração entre pai e filho.
+> O pacote, o card e as imagens do fluxo filho serão adicionados após a conclusão do desenvolvimento.
 
 ---
 
-## Integração entre os fluxos
-
-Os dois fluxos devem estar na mesma solução do Power Automate.
-
-A chamada do fluxo filho deve ficar depois do loop do fluxo pai:
-
-```text
-Processar todos os controles no fluxo pai
-        ↓
-Finalizar o loop
-        ↓
-Executar o fluxo filho uma única vez
-```
-
-A chamada não deve ficar dentro do loop de controles, pois isso executaria o fluxo filho várias vezes.
-
----
-
-## Estrutura do repositório
+# Estrutura do repositório
 
 ```text
 power-automate-compliance-notifications/
 ├── README.md
 ├── adaptive-cards/
-│   ├── README.md
-│   ├── responsible-notification.json
-│   └── manager-summary.json
+│   └── responsible-notification.json
 ├── card-icons/
 │   └── ludgeriios-logo.png
 ├── fotos da estrutura do fluxo/
 │   ├── inicializacao-fluxo-responsavel.png
 │   ├── validacao-data-fluxo-responsavel.png
 │   ├── envio-notificacao-fluxo-responsavel.png
-│   └── estrutura-completa.png
-├── sample-data/
-│   └── Compliance_Control_Monitoring_Lab.xlsx
-└── solution/
+│   ├── estrutura-completa.png
+│   └── previa-card-responsavel.png
+├── fluxos/
+│   └── fluxo-pai/
+│       ├── README.md
+│       └── LAB-COMPLIANCE-NOTIFICACAO-RESPONSAVEL.zip
+└── sample-data/
+    └── Compliance_Control_Monitoring_Lab.xlsx
 ```
 
----
+## Observação sobre importação
 
-## Como executar em laboratório
-
-1. Importe o fluxo pai como um novo fluxo no Power Automate.
-2. Configure conexões próprias para Excel Online e Microsoft Teams.
-3. Aponte a ação de leitura para `Compliance_Control_Monitoring_Lab.xlsx`.
-4. Selecione a tabela `Tabela1`.
-5. Mantenha um destinatário autorizado e fixo durante os testes.
-6. Execute o fluxo manualmente.
-7. Confira os cards recebidos e os registros no log.
-8. Conecte o fluxo filho somente depois de validar o envio consolidado aos gerentes.
-
----
-
-## Segurança
-
-Este projeto deve utilizar somente dados fictícios.
-
-Antes de tornar o repositório público, confirme que não existem:
-
-- nomes ou e-mails reais;
-- nomes de empresas;
-- URLs internas;
-- nomes de sites corporativos;
-- contas de serviço;
-- IDs de conexões, arquivos ou ambientes;
-- históricos reais de notificações.
+O pacote não inclui senhas. Durante a importação, cada usuário deve selecionar as próprias conexões e configurar o arquivo e as tabelas do ambiente de laboratório.
