@@ -12,7 +12,15 @@
       "wrap": true,
       "horizontalAlignment": "Center"
     },
-    {
+{
+  "type": "Image",
+  "url": "https://raw.githubusercontent.com/ludgerios/power-automate-compliance-notifications-/main/card-icons/ludgeriios-logo.png",
+  "altText": "Ludgeriios Automações e Soluções",
+  "size": "Stretch",
+  "horizontalAlignment": "Center",
+  "spacing": "None"
+},
+     {
       "type": "TextBlock",
       "weight": "Bolder",
       "text": "Hello, @{item()?['ControlOwner']}!",
