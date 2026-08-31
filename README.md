@@ -184,7 +184,7 @@ O card apresenta:
 - botão para acessar o projeto.
 
 <p align="center">
-  <img src="">
+  <img src="https://github.com/ludgerios/power-automate-compliance-notifications-/blob/main/card-icons/card.png">
 </p>
 
 <p align="center"><em>Exemplo do Adaptive Card enviado pelo Microsoft Teams.</em></p>
