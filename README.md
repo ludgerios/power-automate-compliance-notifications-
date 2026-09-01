@@ -57,7 +57,7 @@ O fluxo pai consulta a base de laboratório, valida os controles elegíveis e en
 
 ## Regras de processamento
 
-O controle somente continua quando todas as condições abaixo são atendidas:
+O controle somente avança quando todas as condições abaixo são atendidas:
 
 ```text
 ControlStatus = Work
@@ -129,7 +129,7 @@ O gatilho manual solicita o campo:
 DestinatarioTeste
 ```
 
-O valor é armazenado em `varDestinatario` e utilizado no envio do Teams e no registro do log. O endereço informado deve representar um usuário válido no mesmo tenant da conexão do Microsoft Teams.
+O valor é armazenado em `varDestinatario` e utilizado no envio pelo Teams e no registro do log. O endereço informado deve representar um usuário válido no mesmo tenant da conexão do Microsoft Teams.
 
 ## Funcionamento técnico
 
@@ -145,7 +145,7 @@ O fluxo recebe o destinatário de teste, inicializa as variáveis, lê a `Tabela
 
 ### 2. Validação e cálculo
 
-Para cada controle, o fluxo valida `ControlStatus`, `TestStatus` e `NextTestDate`. Depois, calcula `DiasParaVencer`.
+Para cada controle, o fluxo valida `ControlStatus`, `TestStatus` e `NextTestDate`. Em seguida, calcula `DiasParaVencer`.
 
 <p align="center">
   <img src="fotos%20da%20estrutura%20do%20fluxo/validacao-data-fluxo-responsavel.png" alt="Validação da data e cálculo dos dias" width="900">
@@ -230,11 +230,33 @@ Após importar o pacote como um novo fluxo:
 
 # Fluxo filho
 
-## Notificação consolidada ao gerente
+## LAB-COMPLIANCE-NOTIFICACAO-GERENTE
 
-O fluxo filho será responsável por agrupar controles atrasados por `ManagerEmail` e enviar **um único card para cada gerente**.
+O fluxo filho agrupa controles atrasados por `ManagerEmail` e envia um único Adaptive Card consolidado para cada gerente. É chamado uma única vez pelo fluxo pai, após a conclusão do loop de processamento.
 
-## Regras previstas
+## Base de laboratório
+
+- **Arquivo:** `Compliance_Control_Monitoring_Lab.xlsx`
+- **Tabela de controles:** `Tabela1`
+- **Tabela de log:** `Tabela2`
+- **Armazenamento:** OneDrive for Business
+
+### Colunas utilizadas
+
+| Coluna | Utilização |
+|---|---|
+| `ControlID` | Código do controle |
+| `ControlOwner` | Nome do responsável |
+| `ControlDescription` | Descrição do controle |
+| `ControlStatus` | Situação operacional do controle |
+| `NextTestDate` | Data do próximo teste em número serial do Excel |
+| `TestStatus` | Situação do teste |
+| `ManagerName` | Nome demonstrativo do gerente |
+| `ManagerEmail` | E-mail demonstrativo do gerente, destinatário do card consolidado |
+
+## Regras de processamento
+
+O controle somente é incluído na notificação ao gerente quando todas as condições abaixo são atendidas:
 
 ```text
 ControlStatus = Work
@@ -243,25 +265,63 @@ TestStatus = LATE
 E
 ManagerEmail preenchido
 E
-NextTestDate válida
+NextTestDate contém um número serial válido
 E
 DiasParaVencer = -1, -5 ou -7
 ```
 
-O card consolidado apresentará:
+### Marcos de notificação
+
+| Resultado | Comportamento |
+|---:|---|
+| `-1` | Inclui o controle no card com 1 dia de atraso |
+| `-5` | Inclui o controle no card com 5 dias de atraso |
+| `-7` | Inclui o controle no card com 7 dias de atraso |
+
+Outros resultados não geram notificação ao gerente.
+
+## Comportamento de agrupamento
+
+- O fluxo agrupa todos os controles elegíveis pelo campo `ManagerEmail`.
+- Cada gerente recebe um único card por execução, contendo apenas os controles associados ao seu e-mail.
+- O card consolidado apresenta uma linha por controle no seguinte formato:
 
 ```text
 Nº Controle | Responsável | Data do teste | Dias em atraso
 ```
 
-### Comportamento esperado
+## Funcionamento técnico
 
-- Um card por gerente em cada execução.
-- Vários controles podem ser consolidados no mesmo card.
-- Cada gerente recebe apenas os controles associados ao respectivo `ManagerEmail`.
-- O fluxo filho é chamado uma única vez, após a conclusão do loop do fluxo pai.
+> O pacote, o Adaptive Card e as imagens do fluxo filho serão adicionados após a conclusão do desenvolvimento.
 
-> O pacote, o card e as imagens do fluxo filho serão adicionados após a conclusão do desenvolvimento.
+## Log de notificações
+
+O envio é registrado na `Tabela2` com os seguintes campos:
+
+| Campo | Conteúdo |
+|---|---|
+| `Data Envio` | Data e hora do envio |
+| `Controle` | Códigos dos controles incluídos no card |
+| `Data do Teste` | Datas previstas para os testes |
+| `Qtd de Dias` | Dias em atraso por controle |
+| `Email` | E-mail do gerente destinatário |
+| `Status` | Resultado do envio |
+| `tipo` | `Gerente` |
+
+## Pacote importável
+
+O pacote do fluxo filho estará disponível em:
+
+```text
+fluxos/fluxo-filho/
+```
+
+Após importar o pacote como um novo fluxo:
+
+1. selecione conexões próprias para Excel Online e Microsoft Teams;
+2. configure `Compliance_Control_Monitoring_Lab.xlsx`;
+3. selecione `Tabela1` na ação de leitura;
+4. selecione `Tabela2` na ação de log.
 
 ---
 
@@ -271,7 +331,8 @@ Nº Controle | Responsável | Data do teste | Dias em atraso
 power-automate-compliance-notifications/
 ├── README.md
 ├── adaptive-cards/
-│   └── responsible-notification.json
+│   ├── responsible-notification.json
+│   └── manager-notification.json
 ├── card-icons/
 │   └── ludgeriios-logo.png
 ├── fotos da estrutura do fluxo/
@@ -281,9 +342,12 @@ power-automate-compliance-notifications/
 │   ├── estrutura-completa.png
 │   └── previa-card-responsavel.png
 ├── fluxos/
-│   └── fluxo-pai/
+│   ├── fluxo-pai/
+│   │   ├── README.md
+│   │   └── LAB-COMPLIANCE-NOTIFICACAO-RESPONSAVEL.zip
+│   └── fluxo-filho/
 │       ├── README.md
-│       └── LAB-COMPLIANCE-NOTIFICACAO-RESPONSAVEL.zip
+│       └── LAB-COMPLIANCE-NOTIFICACAO-GERENTE.zip
 └── sample-data/
     └── Compliance_Control_Monitoring_Lab.xlsx
 ```
